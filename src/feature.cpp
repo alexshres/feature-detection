@@ -6,38 +6,50 @@
 */
 
 #include <opencv2/opencv.hpp>			// catches all the above and more includes
+#include <chrono>
 
+using namespace cv;
 
-int main() 
+int main(int argc, char** argv) 
 {
-
-	std::string img_path = "../data/im3.jpg";
-	cv::Mat img = cv::imread(img_path, cv::IMREAD_GRAYSCALE);
-
-	if (img.empty())
-	{
-		std::cout << "Could not read the image: " << img_path << std::endl;
+	if (argc != 3) {
+		std::cout << "usage: ./feature_detection img1 img2" << std::endl;
 		return 1;
 	}
 
+	Mat img1 = imread(argv[1], IMREAD_GRAYSCALE);
+	Mat img2 = imread(argv[2], IMREAD_GRAYSCALE);
 
-	// Creating ORB detector
-	cv::Ptr<cv::ORB> orb = cv::ORB::create();
+	if (img1.empty() || img2.empty())
+	{
+		std::cout << "Could not read images" << std::endl;
+		return 1;
+	}
 
-	// Detect keypoints
-	std::vector<cv::KeyPoint> keypoints;
-	orb->detect(img, keypoints);
+	//-- initialization
+	std::vector<KeyPoint> keypoints1, keypoints2;
+	Mat descriptors1, descriptors2;
+	Ptr<FeatureDetector> detector = ORB::create();
+	Ptr<DescriptorExtractor> descriptor = ORB::create();
+	Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
 
-	// Compute descriptors
-	cv::Mat descriptors;		
-	orb->compute(img, keypoints, descriptors);
+	//-- detect Oriented Fast
+	std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+	detector->detect(img1, keypoints1);
+	detector->detect(img2, keypoints2);
 
-	// Drawing keypoint on objects
-	cv::Mat img_with_kps;
-	cv::drawKeypoints(img, keypoints, cv::Scalar::all(-1));
+	//-- compute BRIEF descriptor
+	descriptor->compute(img1, keypoints1, descriptors1);
+	descriptor->compute(img2, keypoints2, descriptors2);
+	std::chrono::steady_clock::time_point t2 =std::chrono::steady_clock::now();
+	std::chrono::duration<double> time_used = std::chrono::duration_cast<std::chrono::duration<double>>(t2-t1);
 
-	cv::imshow("ORB Keypoints", img_with_kps);
-	int k = cv::waitKey(0);
+	std::cout << "extract ORB cost = " << time_used.count() << " seconds. " << std::endl;
+
+	Mat outimg1;
+	drawKeypoints(img1, keypoints1, outimg1, Scalar::all(-1), DrawMatchesFlags::DEFAULT);
+	imshow("ORB features", outimg1);
+	waitKey(0);
 
 	return 0;
 }
